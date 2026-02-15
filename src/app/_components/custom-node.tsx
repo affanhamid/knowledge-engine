@@ -1,9 +1,9 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useCallback } from "react";
 import { Handle, Position, NodeResizer, useStore, type NodeProps } from "@xyflow/react";
-import { Layers, ChevronLeft, ChevronRight } from "lucide-react";
-import { MarkdownRenderer } from "@affanhamid/markdown-renderer";
+import { Layers, ChevronLeft, ChevronRight, Copy, Check } from "lucide-react";
+import { MarkdownRenderer, type CodeExecutionResult } from "@affanhamid/markdown-renderer";
 
 type CardData = {
   id: string;
@@ -32,6 +32,7 @@ export type CompositeNodeData = {
   label: string;
   subGraphId?: string | null;
   layers: LayerData[];
+  graphId: string;
   onResizeEnd?: (width: number, height: number) => void;
 };
 
@@ -62,11 +63,61 @@ function getSrsColor(card: CardData | null): string {
 }
 
 const ZOOM_DETAIL_THRESHOLD = 0.5;
+const EXECUTABLE_LANGUAGES = ["python", "py", "r"];
 
 function CompositeNodeComponent({ id, data, selected }: NodeProps & { data: CompositeNodeData }) {
   const [activeLayerIndex, setActiveLayerIndex] = useState(0);
   const [activeQaIndex, setActiveQaIndex] = useState(0);
+  const [copied, setCopied] = useState(false);
   const isOverview = useStore((s) => s.transform[2] < ZOOM_DETAIL_THRESHOLD);
+
+  const onRunCode = useCallback(
+    async (code: string, language: string): Promise<CodeExecutionResult> => {
+      const res = await fetch("/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language, graphId: data.graphId }),
+      });
+      return (await res.json()) as CodeExecutionResult;
+    },
+    [data.graphId],
+  );
+
+  const handleCopyAll = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const sorted = [...data.layers].sort((a, b) => a.order - b.order);
+    const parts: string[] = [`# ${data.label}`, ""];
+
+    for (const layer of sorted) {
+      const heading = layer.title ?? layer.type.charAt(0).toUpperCase() + layer.type.slice(1);
+      parts.push(`## ${heading}`);
+      parts.push("");
+
+      const qas = [...layer.qaPairs].sort((a, b) => a.order - b.order);
+      for (const qa of qas) {
+        parts.push(`**Q:** ${qa.question}`);
+        parts.push("");
+        parts.push(`**A:** ${qa.answer}`);
+        parts.push("");
+      }
+      if (qas.length === 0) {
+        parts.push("*No Q&A pairs*");
+        parts.push("");
+      }
+      parts.push("---");
+      parts.push("");
+    }
+
+    // Remove trailing separator
+    if (parts.length >= 2 && parts[parts.length - 2] === "---") {
+      parts.splice(parts.length - 2, 2);
+    }
+
+    void navigator.clipboard.writeText(parts.join("\n")).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [data.label, data.layers]);
 
   const sortedLayers = [...data.layers].sort((a, b) => a.order - b.order);
   const activeLayer = sortedLayers[activeLayerIndex];
@@ -81,13 +132,13 @@ function CompositeNodeComponent({ id, data, selected }: NodeProps & { data: Comp
 
   return (
     <div
-      className={`relative flex h-full w-full flex-col rounded-lg border bg-white shadow-sm transition-shadow dark:bg-gray-900 ${
+      className={`relative flex ${isOverview ? "h-auto w-auto" : "h-full w-full"} flex-col rounded-lg border bg-white shadow-sm transition-shadow dark:bg-gray-900 ${
         selected ? "border-blue-500 shadow-md" : "border-gray-200 dark:border-gray-700"
       }`}
       style={{
         minWidth: isOverview ? undefined : 200,
         minHeight: isOverview ? undefined : 100,
-        ...(isOverview ? { width: "max-content", borderWidth: 4 } : {}),
+        ...(isOverview ? { width: "max-content", height: "fit-content", borderWidth: 4 } : {}),
       }}
     >
       <NodeResizer
@@ -121,9 +172,20 @@ function CompositeNodeComponent({ id, data, selected }: NodeProps & { data: Comp
         >
           {data.label}
         </div>
-        {data.subGraphId && (
-          <Layers className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-500" />
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {data.subGraphId && (
+            <Layers className="h-3.5 w-3.5 text-blue-500" />
+          )}
+          {!isOverview && sortedLayers.length > 0 && (
+            <button
+              onClick={handleCopyAll}
+              className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              title="Copy all layers as markdown"
+            >
+              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Everything below the header is hidden when zoomed out */}
@@ -166,7 +228,7 @@ function CompositeNodeComponent({ id, data, selected }: NodeProps & { data: Comp
                 <div className="border-t border-gray-100 pt-2 dark:border-gray-800">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">A</span>
                   <div className="text-xs text-gray-800 dark:text-gray-200">
-                    <MarkdownRenderer markdown={activeQa.answer} />
+                    <MarkdownRenderer markdown={activeQa.answer} onRunCode={onRunCode} executableLanguages={EXECUTABLE_LANGUAGES} />
                   </div>
                 </div>
               </div>

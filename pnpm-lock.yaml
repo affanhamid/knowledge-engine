@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@affanhamid/markdown-renderer':
         specifier: github:affanhamid/markdown-renderer
-        version: https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/3dd1955436a50ad6913835f19fda28ec6044441b(react@19.2.4)
+        version: https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/4e521e76fe38e6fccef2d2ba1d7c2a5460946cfd(react@19.2.4)
       '@dagrejs/dagre':
         specifier: ^2.0.4
         version: 2.0.4
@@ -135,9 +135,9 @@ importers:
 
 packages:
 
-  '@affanhamid/markdown-renderer@https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/3dd1955436a50ad6913835f19fda28ec6044441b':
-    resolution: {tarball: https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/3dd1955436a50ad6913835f19fda28ec6044441b}
-    version: 1.0.1
+  '@affanhamid/markdown-renderer@https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/4e521e76fe38e6fccef2d2ba1d7c2a5460946cfd':
+    resolution: {tarball: https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/4e521e76fe38e6fccef2d2ba1d7c2a5460946cfd}
+    version: 1.0.2
     peerDependencies:
       react: '>=18'
 
@@ -4264,7 +4264,7 @@ packages:
 
 snapshots:
 
-  '@affanhamid/markdown-renderer@https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/3dd1955436a50ad6913835f19fda28ec6044441b(react@19.2.4)':
+  '@affanhamid/markdown-renderer@https://codeload.github.com/affanhamid/markdown-renderer/tar.gz/4e521e76fe38e6fccef2d2ba1d7c2a5460946cfd(react@19.2.4)':
     dependencies:
       katex: 0.16.28
       react: 19.2.4

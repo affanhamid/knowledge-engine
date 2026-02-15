@@ -75,7 +75,7 @@ type DbEdge = {
   createdAt: string;
 };
 
-function dbNodesToFlow(dbNodes: DbNode[], makeResizeHandler: (id: string) => (w: number, h: number) => void): RFNode[] {
+function dbNodesToFlow(dbNodes: DbNode[], graphId: string, makeResizeHandler: (id: string) => (w: number, h: number) => void): RFNode[] {
   return dbNodes.map((n) => ({
     id: n.id,
     type: "custom",
@@ -87,6 +87,7 @@ function dbNodesToFlow(dbNodes: DbNode[], makeResizeHandler: (id: string) => (w:
       label: n.label,
       subGraphId: n.subGraphId,
       layers: n.layers,
+      graphId,
       onResizeEnd: makeResizeHandler(n.id),
     } satisfies CompositeNodeData,
   }));
@@ -153,6 +154,40 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
   const [newQuestion, setNewQuestion] = useState("");
   const [newAnswer, setNewAnswer] = useState("");
   const [addingToLayerId, setAddingToLayerId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileDrop = useCallback(
+    async (
+      e: React.DragEvent<HTMLTextAreaElement>,
+      setter: React.Dispatch<React.SetStateAction<string>>,
+    ) => {
+      e.preventDefault();
+      const files = e.dataTransfer.files;
+      if (!files.length) return;
+
+      setIsUploading(true);
+      try {
+        for (const file of Array.from(files)) {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("type", "images");
+
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          if (!res.ok) continue;
+          const data = (await res.json()) as { filePath: string; fileName: string };
+
+          const markdownLink = file.type.startsWith("image/")
+            ? `![${data.fileName}](/api/files/${data.filePath})`
+            : `[${data.fileName}](/api/files/${data.filePath})`;
+
+          setter((prev) => (prev ? prev + "\n" + markdownLink : markdownLink));
+        }
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [],
+  );
 
   const panelDragRef = useRef<{ axis: "x" | "y" | "xy"; startX: number; startY: number; startWidth: number; startHeight: number } | null>(null);
 
@@ -261,7 +296,7 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
 
     if (!initializedRef.current) {
       // First load — set positions and everything
-      const flowNodes = dbNodesToFlow(dbNodes as DbNode[], makeResizeHandler);
+      const flowNodes = dbNodesToFlow(dbNodes as DbNode[], graphId, makeResizeHandler);
       setNodes(flowNodes);
       setEdges(dbEdgesToFlow(dbEdges));
       initializedRef.current = true;
@@ -279,6 +314,7 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
               label: dbNode.label,
               subGraphId: dbNode.subGraphId,
               layers: dbNode.layers,
+              graphId,
               onResizeEnd: makeResizeHandler(rfNode.id),
             } satisfies CompositeNodeData,
           };
@@ -374,6 +410,7 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
                 label: "New Node",
                 subGraphId: null,
                 layers: [],
+                graphId,
                 onResizeEnd: makeResizeHandler(result.id),
               } satisfies CompositeNodeData,
             };
@@ -417,6 +454,7 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
                 label: "New Node",
                 subGraphId: null,
                 layers: [],
+                graphId,
                 onResizeEnd: makeResizeHandler(result.id),
               } satisfies CompositeNodeData,
             },
@@ -724,6 +762,7 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
             label: n.label,
             subGraphId: null,
             layers: [],
+            graphId,
             onResizeEnd: makeResizeHandler(n.id),
           } satisfies CompositeNodeData,
         }));
@@ -1047,7 +1086,9 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
                                     <textarea
                                       value={editAnswer}
                                       onChange={(e) => setEditAnswer(e.target.value)}
-                                      placeholder="Answer"
+                                      onDragOver={(e) => e.preventDefault()}
+                                      onDrop={(e) => void handleFileDrop(e, setEditAnswer)}
+                                      placeholder={isUploading ? "Uploading..." : "Answer (drop files here)"}
                                       rows={3}
                                       className="w-full rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                                     />
@@ -1112,7 +1153,9 @@ export function FlowEditor({ graphId, parentFolderId, onStateChange }: FlowEdito
                           <textarea
                             value={newAnswer}
                             onChange={(e) => setNewAnswer(e.target.value)}
-                            placeholder="Answer (supports markdown)"
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => void handleFileDrop(e, setNewAnswer)}
+                            placeholder={isUploading ? "Uploading..." : "Answer (supports markdown, drop files here)"}
                             rows={3}
                             className="w-full rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                           />
